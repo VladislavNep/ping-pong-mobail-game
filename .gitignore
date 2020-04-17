@@ -1,0 +1,5 @@
+venv
+.idea
+*.рус
+movie.csv
+movie2.csv
