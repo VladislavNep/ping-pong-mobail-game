@@ -1,5 +1,10 @@
+import re
+
 from fake_useragent import UserAgent
 import scrapy
+from scrapy.loader import ItemLoader
+
+from ..items import MovieItem, MovieLoader, MovieIdItem, MovieIdLoader, PersonIdItem, PersonIdLoader
 
 
 class MovieSpider(scrapy.Spider):
@@ -25,15 +30,30 @@ class MovieSpider(scrapy.Spider):
     }
     """
     name = "movie"
-    HEADERS = {'user-agent': UserAgent().random, 'accept': '*/*'}
+    HEADERS = {'User-Agent': UserAgent().random, 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,'
+                                                           '*/*;q=0.8'}
     BASE_URL = 'https://www.kinopoisk.ru'
     css = {
         'movie_items': 'div.selection-list > div.desktop-rating-selection-film-item',
-        'title': 'a.selection-film-item-meta__link p.selection-film-item-meta__name::text',
-        'rating_kp': 'span.film-item-user-data__rating span.rating__value::text',
+        'title': '.moviename-title-wrapper::text',
         'movie_link': 'a.selection-film-item-meta__link::attr(href)',
         'movie_info': 'div.movie-info__table-container>#infoTable>table#info',
         'actors': 'div.movie-info__table-container>#actorList ul',
+        'world_premier': '#div_world_prem_td2 > div:nth-child(1) > a::text',
+        'rf_premiere': '.rel-date_description > span:nth-child(2) > a::text',
+        'country': 'table.info > tr:nth-child(2) > td:nth-child(2) > div:nth-child(1) > a::text',
+        'budget1': '.en > td.dollar a::text',
+        'budget2': '.en > td.dollar ::text',
+        'description': '.film-synopsys::text',
+        'time': '#runtime::text',
+        'fees_in_usa': '#div_usa_box_td2 > div:nth-child(1) > a::text',
+    }
+
+    xpath = {
+        'directors': './/td[@itemprop="director"]/a/text()',
+        'director_id': './/td[@itemprop="director"]/a/@href',
+        'genre': './/td[2]/span[@itemprop="genre"]/a/text()',
+        'rating_kp': './/meta[@itemprop="ratingValue"]/@content',
     }
 
     # def __init__(self, start_url, **kwargs):
@@ -41,74 +61,70 @@ class MovieSpider(scrapy.Spider):
     #     self.start_url = start_url
 
     def start_requests(self):
-        # start_url = 'https://www.kinopoisk.ru/lists/navigator/2015-2020/?quick_filters=high_rated%2Cfilms&tab=all'
         start_url = 'https://www.kinopoisk.ru/popular/?quick_filters=films&tab=all'
         yield scrapy.Request(url=start_url, headers=self.HEADERS, callback=self.parse)
 
     def parse(self, response, i=1):
         print(f"Парсинг {i} страницы")
         for movie_item in response.css(self.css['movie_items']):
+            loader = MovieIdLoader(item=MovieIdItem())
             movie_id = movie_item.css(self.css['movie_link']).re_first(r'([0-9]\d*)')
-            title = movie_item.css(self.css['title']).get()
-            rating_kp = movie_item.css(self.css['rating_kp']).get()
-            yield from response.follow_all(urls=[f'{self.BASE_URL}/film/{movie_id}'],
-                                           callback=self.get_movie_info, headers=self.HEADERS,
-                                           cb_kwargs=dict(title=title, movie_id=movie_id, rating_kp=rating_kp))
+            loader.add_value('movie_id', int(movie_id))
+            loader.load_item()
+
+            yield response.follow(url=f'{self.BASE_URL}/film/{movie_id}', callback=self.get_movie_info,
+                                  headers=self.HEADERS, cb_kwargs=dict(movie_id=movie_id))
 
         if self.get_next_page(response) is not None:
             i += 1
-            yield response.follow(url=self.get_next_page(response), callback=self.parse, headers=self.HEADERS, cb_kwargs=dict(i=i))
+            yield response.follow(url=self.get_next_page(response), callback=self.parse, headers=self.HEADERS,
+                                  cb_kwargs=dict(i=i))
 
-    def get_movie_info(self, response, title, movie_id, rating_kp):
-        world_premiere = response.css('#div_world_prem_td2 > div:nth-child(1) > a::text').get()
-        rf_premiere = response.css('.rel-date_description > span:nth-child(2) > a::text').get()
-        country = response.css('table.info > tr:nth-child(2) > td:nth-child(2) > div:nth-child(1) > a::text').getall()
-        directors = response.xpath('//td[@itemprop="director"]/a/text()').getall()
-        genre = response.xpath('//td[2]/span[@itemprop="genre"]/a/text()').getall()
+    def get_movie_info(self, response, movie_id):
+        loader_inf = MovieLoader(item=MovieItem(), response=response)
+        loader_inf.add_css('title', self.css['title'])
+        loader_inf.add_xpath('rating_kp', self.xpath['rating_kp'])
+        loader_inf.add_css('world_premier', self.css['world_premier'], re=r'^[а-яА-ЯёЁ0-9\s]+$')
+        loader_inf.add_css('rf_premiere', self.css['world_premier'], re=r'^[а-яА-ЯёЁ0-9\s]+$')
+        loader_inf.add_css('country', self.css['country'])
+        loader_inf.add_xpath('directors', self.xpath['directors'])
+        loader_inf.add_xpath('genre', self.xpath['genre'])
+        loader_inf.add_css('fees_in_usa', self.css['fees_in_usa'], re=r'([0-9]\d*)')
+        loader_inf.add_css('time', self.css['time'], re=r'([0-9]\d*)')
+        loader_inf.add_css('description', self.css["description"])
         # бюджет и сборы в $
-        budget = ''.join(response.css('.en > td.dollar a::text').re(r'([0-9]\d*)') or response.css('.en > td.dollar ::text').re(r'([0-9]\d*)'))
-        fees_in_usa = ''.join(response.css('#div_usa_box_td2 > div:nth-child(1) > a::text').re(r'([0-9]\d*)'))
-        fees_in_world_str = ''.join(response.xpath('//td[@id="div_world_box_td2"]/div[1]/a[1]/text()').re(r'([0-9=]\d*)') or response.xpath('//tr[14]/td[@class="dollar" and 2]/div[1]/a[1]').re(r'([0-9=]\d*)'))
+        budget = ''.join(response.css(self.css['budget1']).re(r'([0-9]\d*)') or response.css(self.css['budget2']).re(r'([0-9]\d*)'))
+        loader_inf.add_value('budget', budget)
+        fees_in_world_str = ''.join(
+            response.xpath('//td[@id="div_world_box_td2"]/div[1]/a[1]/text()').re(r'([0-9=]\d*)') or response.xpath(
+                '//tr[14]/td[@class="dollar" and 2]/div[1]/a[1]').re(r'([0-9=]\d*)'))
         fees_in_world = fees_in_world_str[fees_in_world_str.rfind('=') + 1:]
-        # time в мин
-        time = response.css('#runtime::text').re_first(r'([0-9]\d*)')
-        actors_name = response.css(self.css['actors'])[0].css('li>a::text')[:5]
-        actors_id = response.css(self.css['actors'])[0].css('li>a::attr(href)')[:5]
-        if actors_name.get() is not None:
-            actors_name = actors_name.getall()
-            actors_id = actors_id.re(r'([0-9]\d*)')
-        else:
-            actors_id = None
-            actors_name = None
+        loader_inf.add_value('fees_in_world', fees_in_world)
+        if response.css(self.css['actors']) is not None:
+            actors_name = response.css(self.css['actors'])[0].css('li>a::text')[:5].getall()
+            loader_inf.add_value('actors', actors_name)
 
-        description = response.css('.film-synopsys::text').get()
-        yield {
-            'title': title,
-            'movie_id': movie_id,
-            'rating_kp': rating_kp,
-            'country': country,
-            'directors': directors,
-            'actors_name': actors_name,
-            'genre': genre,
-            'budget': budget,
-            'fees_in_usa': fees_in_usa,
-            'fees_in_world': fees_in_world,
-            'world_premiere': world_premiere,
-            'rf_premiere': rf_premiere,
-            'time': time,
-            'description': description,
-        }
+        self.get_person_id(response)
+        self.get_movie_poser(response, movie_id)
+        yield loader_inf.load_item()
 
-    def get_person_info(self, response):
-        pass
+    def get_person_id(self, response):
+        loader_per = PersonIdLoader(item=PersonIdItem(), response=response)
+        loader_per.add_xpath('person_id', self.xpath['director_id'])
+        actors_id = response.css(self.css['actors'])[0].css('li>a::attr(href)')[:5].re(r'([0-9]\d*)')
+        loader_per.add_value('person_id', actors_id)
+        yield loader_per.load_item()
 
     def get_movie_shots(self, response):
         pass
 
-    def save_movie_poser(self):
-        pass
+    def get_movie_poser(self, response, movie_id):
+        f = ItemLoader(item=MovieItem(), response=response)
+        url = self.BASE_URL + f'/images/film_big/{movie_id}.jpg'
+        f.add_value('poster_urls', url)
+        yield f.load_item()
 
-    def save_movie_shots(self):
+    def save_movie_shots(self, response):
         pass
 
     def get_next_page(self, response):
@@ -119,4 +135,3 @@ class MovieSpider(scrapy.Spider):
     def get_count_page(self, response):
         return response.css('div.paginator a.paginator__page-number::text')[-1].get()
 
-#     response.selector.css('table.info > tr:nth-child(6) > td:nth-child(2) > a::text')[:3].getall()
