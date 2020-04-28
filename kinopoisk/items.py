@@ -31,8 +31,8 @@ def replace_chars(text, which_ones=('\n', '\t', '\x85', '\x97'), replace_by=u'',
 class MovieItem(scrapy.Item):
     title = scrapy.Field()
     description = scrapy.Field()
-    posters = scrapy.Field()
-    poster_urls = scrapy.Field()
+    poster = scrapy.Field()
+    poster_url = scrapy.Field()
     country = scrapy.Field()
     directors = scrapy.Field()
     actors = scrapy.Field()

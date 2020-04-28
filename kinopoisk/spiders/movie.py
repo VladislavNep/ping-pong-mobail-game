@@ -100,31 +100,31 @@ class MovieSpider(scrapy.Spider):
                 '//tr[14]/td[@class="dollar" and 2]/div[1]/a[1]').re(r'([0-9=]\d*)'))
         fees_in_world = fees_in_world_str[fees_in_world_str.rfind('=') + 1:]
         loader_inf.add_value('fees_in_world', fees_in_world)
+
         if response.css(self.css['actors']) is not None:
             actors_name = response.css(self.css['actors'])[0].css('li>a::text')[:5].getall()
             loader_inf.add_value('actors', actors_name)
 
+        # вытаскиваем все id людей для дальнейшего использования
         self.get_person_id(response)
-        self.get_movie_poser(response, movie_id)
+
+        # вытаскиваем постер фильма для скачивания
+        poster_url = self.BASE_URL + f'/images/film_big/{movie_id}.jpg'
+        loader_inf.add_value('poster_url', poster_url)
+
         yield loader_inf.load_item()
 
     def get_person_id(self, response):
         loader_per = PersonIdLoader(item=PersonIdItem(), response=response)
         loader_per.add_xpath('person_id', self.xpath['director_id'])
-        actors_id = response.css(self.css['actors'])[0].css('li>a::attr(href)')[:5].re(r'([0-9]\d*)')
-        loader_per.add_value('person_id', actors_id)
+
+        if response.css(self.css['actors']) is not None:
+            actors_id = response.css(self.css['actors'])[0].css('li>a::attr(href)')[:5].re(r'([0-9]\d*)')
+            loader_per.add_value('person_id', actors_id)
+
         yield loader_per.load_item()
 
     def get_movie_shots(self, response):
-        pass
-
-    def get_movie_poser(self, response, movie_id):
-        f = ItemLoader(item=MovieItem(), response=response)
-        url = self.BASE_URL + f'/images/film_big/{movie_id}.jpg'
-        f.add_value('poster_urls', url)
-        yield f.load_item()
-
-    def save_movie_shots(self, response):
         pass
 
     def get_next_page(self, response):
