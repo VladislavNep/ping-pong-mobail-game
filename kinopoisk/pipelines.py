@@ -31,5 +31,5 @@ class PostersPipeline(ImagesPipeline):
         poster_paths = [x['path'] for ok, x in results if ok]
         if not poster_paths:
             raise DropItem("Item contains no images")
-        item['poster'] = poster_paths
+        item['poster'] = poster_paths[0]
         return item

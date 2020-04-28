@@ -28,6 +28,19 @@ def replace_chars(text, which_ones=('\n', '\t', '\x85', '\x97'), replace_by=u'',
     return text
 
 
+def str_to_int(value):
+    return int(value) if value.isdigit() else value
+
+
+def str_to_float(value):
+    return float(value)
+
+
+def str_lst_to_int(value):
+    result = [int(x) for x in value if x.isdigit()]
+    return result
+
+
 class MovieItem(scrapy.Item):
     title = scrapy.Field()
     description = scrapy.Field()
@@ -56,17 +69,23 @@ class MovieLoader(ItemLoader):
     title_out = TakeFirst()
     world_premier_out = TakeFirst()
     rf_premiere_out = TakeFirst()
+
+    time_in = MapCompose(str_to_int)
     time_out = TakeFirst()
+
+    rating_kp_in = MapCompose(str_to_float)
     rating_kp_out = TakeFirst()
+
+    budget_in = MapCompose(str_to_int)
     budget_out = TakeFirst()
 
     country_out = TakeFirst() if (lambda value: len(value) == 1) else Identity()
     directors_out = TakeFirst() if (lambda value: len(value) == 1) else Identity()
 
-    fees_in_usa_in = Join(separator='')
+    fees_in_usa_in = MapCompose(str_to_int)
     fees_in_usa_out = TakeFirst()
 
-    fees_in_world_in = Join(separator='')
+    fees_in_world_in = MapCompose(str_to_int)
     fees_in_world_out = TakeFirst()
 
 
@@ -75,17 +94,12 @@ class MovieIdItem(scrapy.Item):
 
 
 class MovieIdLoader(ItemLoader):
-    default_output_processor = TakeFirst()
+    default_output_processor = MapCompose()
 
 
 class PersonIdItem(scrapy.Item):
     person_id = scrapy.Field(serializer=int)
 
 
-def in_int(value):
-    for i in value:
-        int(i)
-    return value
-
 class PersonIdLoader(ItemLoader):
-    person_id_in = MapCompose(in_int)
+    person_id_in = MapCompose(str_lst_to_int)

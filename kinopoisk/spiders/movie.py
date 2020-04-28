@@ -3,7 +3,7 @@ import re
 from fake_useragent import UserAgent
 import scrapy
 from scrapy.loader import ItemLoader
-
+from scrapy.loader.processors import Join
 from ..items import MovieItem, MovieLoader, MovieIdItem, MovieIdLoader, PersonIdItem, PersonIdLoader
 
 
@@ -13,11 +13,9 @@ class MovieSpider(scrapy.Spider):
     scrapy crawl movie
 
     :returns: {
-    movie_id: int,
     title: str,
     description: str,
-    tagline: str,
-    poster: link,
+    poster: str: file_path,
     country: str,
     directors: [],
     actors: [],
@@ -65,20 +63,21 @@ class MovieSpider(scrapy.Spider):
         yield scrapy.Request(url=start_url, headers=self.HEADERS, callback=self.parse)
 
     def parse(self, response, i=1):
-        print(f"Парсинг {i} страницы")
+        print(f"Парсинг {i} страницы из {self.get_count_page(response)}")
+        loader_movid = MovieIdLoader(item=MovieIdItem())
         for movie_item in response.css(self.css['movie_items']):
-            loader = MovieIdLoader(item=MovieIdItem())
             movie_id = movie_item.css(self.css['movie_link']).re_first(r'([0-9]\d*)')
-            loader.add_value('movie_id', int(movie_id))
-            loader.load_item()
+            loader_movid.add_value('movie_id', int(movie_id))
 
             yield response.follow(url=f'{self.BASE_URL}/film/{movie_id}', callback=self.get_movie_info,
                                   headers=self.HEADERS, cb_kwargs=dict(movie_id=movie_id))
 
-        if self.get_next_page(response) is not None:
+        if (self.get_next_page(response) is not None) and (i < 2):
             i += 1
             yield response.follow(url=self.get_next_page(response), callback=self.parse, headers=self.HEADERS,
                                   cb_kwargs=dict(i=i))
+
+        yield loader_movid.load_item()
 
     def get_movie_info(self, response, movie_id):
         loader_inf = MovieLoader(item=MovieItem(), response=response)
@@ -89,11 +88,12 @@ class MovieSpider(scrapy.Spider):
         loader_inf.add_css('country', self.css['country'])
         loader_inf.add_xpath('directors', self.xpath['directors'])
         loader_inf.add_xpath('genre', self.xpath['genre'])
-        loader_inf.add_css('fees_in_usa', self.css['fees_in_usa'], re=r'([0-9]\d*)')
+        loader_inf.add_css('fees_in_usa', self.css['fees_in_usa'], Join(separator=''), re=r'([0-9]\d*)')
         loader_inf.add_css('time', self.css['time'], re=r'([0-9]\d*)')
         loader_inf.add_css('description', self.css["description"])
         # бюджет и сборы в $
-        budget = ''.join(response.css(self.css['budget1']).re(r'([0-9]\d*)') or response.css(self.css['budget2']).re(r'([0-9]\d*)'))
+        budget = ''.join(
+            response.css(self.css['budget1']).re(r'([0-9]\d*)') or response.css(self.css['budget2']).re(r'([0-9]\d*)'))
         loader_inf.add_value('budget', budget)
         fees_in_world_str = ''.join(
             response.xpath('//td[@id="div_world_box_td2"]/div[1]/a[1]/text()').re(r'([0-9=]\d*)') or response.xpath(
@@ -134,4 +134,3 @@ class MovieSpider(scrapy.Spider):
 
     def get_count_page(self, response):
         return response.css('div.paginator a.paginator__page-number::text')[-1].get()
-
