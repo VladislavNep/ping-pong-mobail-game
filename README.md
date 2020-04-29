@@ -1,3 +1,3 @@
-# kinopoisk-api
+# kinopoisk-parser
 
-This package is python API to kinopoisk.ru website.
+This package is python parser to kinopoisk.ru website.
