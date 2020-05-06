@@ -1,17 +1,13 @@
-import re
-
 from fake_useragent import UserAgent
 import scrapy
-from scrapy.loader import ItemLoader
 from scrapy.loader.processors import Join
-from ..items import MovieItem, MovieLoader, MovieIdItem, MovieIdLoader, PersonIdItem, PersonIdLoader
+from kinopoisk.items import MovieItem, MovieLoader, MovieIdItem, MovieIdLoader, PersonIdItem, PersonIdLoader
+from inline_requests import inline_requests
 
 
 class MovieSpider(scrapy.Spider):
     """
-    Запуск паука
-    scrapy crawl movie
-
+    :ivar: start_url
     :returns: {
     title: str,
     description: str,
@@ -28,8 +24,10 @@ class MovieSpider(scrapy.Spider):
     }
     """
     name = "movie"
-    HEADERS = {'User-Agent': UserAgent().random, 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,'
-                                                           '*/*;q=0.8'}
+    HEADERS = {
+        'User-Agent': UserAgent().random,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+    }
     BASE_URL = 'https://www.kinopoisk.ru'
     css = {
         'movie_items': 'div.selection-list > div.desktop-rating-selection-film-item',
@@ -60,7 +58,7 @@ class MovieSpider(scrapy.Spider):
 
     def start_requests(self):
         start_url = 'https://www.kinopoisk.ru/popular/?quick_filters=films&tab=all'
-        yield scrapy.Request(url=start_url, headers=self.HEADERS, callback=self.parse)
+        yield scrapy.Request(url=start_url, headers=self.HEADERS, callback=self.parse, meta=dict(proxy='200.195.162.242:3128'))
 
     def parse(self, response, i=1):
         print(f"Парсинг {i} страницы из {self.get_count_page(response)}")
@@ -69,10 +67,15 @@ class MovieSpider(scrapy.Spider):
             movie_id = movie_item.css(self.css['movie_link']).re_first(r'([0-9]\d*)')
             loader_movid.add_value('movie_id', int(movie_id))
 
-            yield response.follow(url=f'{self.BASE_URL}/film/{movie_id}', callback=self.get_movie_info,
-                                  headers=self.HEADERS, cb_kwargs=dict(movie_id=movie_id))
+            yield response.follow(
+                url=f'{self.BASE_URL}/film/{movie_id}',
+                callback=self.get_movie_info,
+                headers=self.HEADERS,
+                cb_kwargs=dict(movie_id=movie_id),
+                meta=dict(proxy='200.195.162.242:3128')
+            )
 
-        if (self.get_next_page(response) is not None) and (i < 2):
+        if self.get_next_page(response) is not None and (i < 3):
             i += 1
             yield response.follow(url=self.get_next_page(response), callback=self.parse, headers=self.HEADERS,
                                   cb_kwargs=dict(i=i))
@@ -91,6 +94,7 @@ class MovieSpider(scrapy.Spider):
         loader_inf.add_css('fees_in_usa', self.css['fees_in_usa'], Join(separator=''), re=r'([0-9]\d*)')
         loader_inf.add_css('time', self.css['time'], re=r'([0-9]\d*)')
         loader_inf.add_css('description', self.css["description"])
+
         # бюджет и сборы в $
         budget = ''.join(
             response.css(self.css['budget1']).re(r'([0-9]\d*)') or response.css(self.css['budget2']).re(r'([0-9]\d*)'))
@@ -101,6 +105,7 @@ class MovieSpider(scrapy.Spider):
         fees_in_world = fees_in_world_str[fees_in_world_str.rfind('=') + 1:]
         loader_inf.add_value('fees_in_world', fees_in_world)
 
+        # вытаскиваем актеров
         if response.css(self.css['actors']) is not None:
             actors_name = response.css(self.css['actors'])[0].css('li>a::text')[:5].getall()
             loader_inf.add_value('actors', actors_name)
@@ -112,7 +117,16 @@ class MovieSpider(scrapy.Spider):
         poster_url = self.BASE_URL + f'/images/film_big/{movie_id}.jpg'
         loader_inf.add_value('poster_url', poster_url)
 
-        yield loader_inf.load_item()
+        # вытаскиваем movie shots
+        yield response.follow(
+            url=self.BASE_URL + f'/film/{movie_id}/stills',
+            callback=self.movie_shots,
+            headers=self.HEADERS,
+            meta={
+                'loader': loader_inf,
+                'proxy': '200.195.162.242:3128'
+            }
+        )
 
     def get_person_id(self, response):
         loader_per = PersonIdLoader(item=PersonIdItem(), response=response)
@@ -124,8 +138,20 @@ class MovieSpider(scrapy.Spider):
 
         yield loader_per.load_item()
 
-    def get_movie_shots(self, response):
-        pass
+    @inline_requests
+    def movie_shots(self, response):
+        loader_inf = response.meta['loader']
+        urls = response.css('table.js-rum-hero > tr > td > a::attr(href)')[:9].getall()
+        for url in urls:
+            res = yield response.follow(
+                url=response.urljoin(url),
+                headers=self.HEADERS,
+                meta=dict(proxy='200.195.162.242:3128')
+            )
+
+            loader_inf.add_value('movie_shot_urls', res.css('img#image::attr(src)').get())
+
+        yield loader_inf.load_item()
 
     def get_next_page(self, response):
         content_url = response.css('div.paginator>a.paginator__page-relative::text')[-1].get() == ('Вперёд' or 'Next')

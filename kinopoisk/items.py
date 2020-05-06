@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
 
-# Define here the models for your scraped items
-#
-# See documentation in:
-# https://docs.scrapy.org/en/latest/topics/items.html
 from scrapy.utils.python import to_unicode
 import scrapy
 from scrapy.loader import ItemLoader
@@ -56,7 +52,9 @@ class MovieItem(scrapy.Item):
     fees_in_world = scrapy.Field()
     age = scrapy.Field()
     movie_shots = scrapy.Field()
-    movie_shot_url = scrapy.Field()
+    movie_shot_urls = scrapy.Field()
+    img_promo = scrapy.Field()
+    img_promo_urls = scrapy.Field()
     rating_kp = scrapy.Field()
     rating_imdb = scrapy.Field()
     genre = scrapy.Field()
@@ -64,6 +62,7 @@ class MovieItem(scrapy.Item):
 
 
 class MovieLoader(ItemLoader):
+
     default_input_processor = MapCompose(replace_chars)
     description_out = TakeFirst()
     title_out = TakeFirst()

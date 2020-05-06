@@ -3,3 +3,4 @@ venv
 *.рус
 movie.csv
 movie2.csv
+items.json
