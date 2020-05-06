@@ -1,10 +1,8 @@
 # -*- coding: utf-8 -*-
 
-# Define your item pipelines here
-#
-# Don't forget to add your pipeline to the ITEM_PIPELINES setting
-# See: https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 import hashlib
+from PIL import Image
+from pathlib import Path
 from scrapy.utils.python import to_bytes
 from scrapy.pipelines.images import ImagesPipeline
 from scrapy.exceptions import DropItem
@@ -37,6 +35,14 @@ class MovieShotsPipeline(ImagesPipeline):
         return 'movie_shots/%s.jpg' % image_guid
 
     def item_completed(self, results, item, info):
+        for ok, x in results:
+            if ok:
+                img = Image.open(Path('kinopoisk/img/' + x['path']))
+                width = img.size[0]
+                height = img.size[1]
+                crop_img = img.crop((0, 0, width, height - 50))
+                crop_img.save(Path('kinopoisk/img/' + x['path']))
+
         movie_shots_paths = [x['path'] for ok, x in results if ok]
         if not movie_shots_paths:
             raise DropItem("Item contains no images")

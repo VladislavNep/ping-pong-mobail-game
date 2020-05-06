@@ -72,7 +72,7 @@ class MovieLoader(ItemLoader):
     time_in = MapCompose(str_to_int)
     time_out = TakeFirst()
 
-    rating_kp_in = MapCompose(str_to_float)
+    rating_kp_in = MapCompose(lambda value: float(value))
     rating_kp_out = TakeFirst()
 
     budget_in = MapCompose(str_to_int)

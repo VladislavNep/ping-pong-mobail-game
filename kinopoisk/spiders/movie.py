@@ -20,7 +20,7 @@ class MovieSpider(scrapy.Spider):
     fees_in_usa: int,
     fees_in_world: int,
     age: int,
-    movie_shots: [],
+    movie_shots: [file_path],
     }
     """
     name = "movie"
@@ -50,6 +50,8 @@ class MovieSpider(scrapy.Spider):
         'director_id': './/td[@itemprop="director"]/a/@href',
         'genre': './/td[2]/span[@itemprop="genre"]/a/text()',
         'rating_kp': './/meta[@itemprop="ratingValue"]/@content',
+        'imdb': './/div[@id="block_rating"]//div[@class="block_2"]//div[last()]/text()',
+        'imdb2': './/div[@id="block_rating"]//div[@class="block_2"]//div[last()-1]/text()',
     }
 
     # def __init__(self, start_url, **kwargs):
@@ -58,7 +60,12 @@ class MovieSpider(scrapy.Spider):
 
     def start_requests(self):
         start_url = 'https://www.kinopoisk.ru/popular/?quick_filters=films&tab=all'
-        yield scrapy.Request(url=start_url, headers=self.HEADERS, callback=self.parse, meta=dict(proxy='200.195.162.242:3128'))
+        yield scrapy.Request(
+            url=start_url,
+            headers=self.HEADERS,
+            callback=self.parse,
+            meta=dict(proxy='200.195.162.242:3128')
+        )
 
     def parse(self, response, i=1):
         print(f"Парсинг {i} страницы из {self.get_count_page(response)}")
@@ -75,10 +82,10 @@ class MovieSpider(scrapy.Spider):
                 meta=dict(proxy='200.195.162.242:3128')
             )
 
-        if self.get_next_page(response) is not None and (i < 3):
-            i += 1
-            yield response.follow(url=self.get_next_page(response), callback=self.parse, headers=self.HEADERS,
-                                  cb_kwargs=dict(i=i))
+        # if self.get_next_page(response) is not None and (i < 3):
+        #     i += 1
+        #     yield response.follow(url=self.get_next_page(response), callback=self.parse, headers=self.HEADERS,
+        #                           cb_kwargs=dict(i=i))
 
         yield loader_movid.load_item()
 
@@ -95,10 +102,17 @@ class MovieSpider(scrapy.Spider):
         loader_inf.add_css('time', self.css['time'], re=r'([0-9]\d*)')
         loader_inf.add_css('description', self.css["description"])
 
+        imdb = response.xpath(self.xpath['imdb']).re_first(r'^IMDb: ([0-9.]+) \(([0-9 ]+)\)$')
+        if not imdb:
+            imdb = response.xpath(self.xpath['imdb2']).re_first(r'^IMDb: ([0-9.]+) \(([0-9 ]+)\)$')
+        if imdb:
+            loader_inf.add_value('rating_imdb', float(imdb))
+
         # бюджет и сборы в $
         budget = ''.join(
             response.css(self.css['budget1']).re(r'([0-9]\d*)') or response.css(self.css['budget2']).re(r'([0-9]\d*)'))
         loader_inf.add_value('budget', budget)
+
         fees_in_world_str = ''.join(
             response.xpath('//td[@id="div_world_box_td2"]/div[1]/a[1]/text()').re(r'([0-9=]\d*)') or response.xpath(
                 '//tr[14]/td[@class="dollar" and 2]/div[1]/a[1]').re(r'([0-9=]\d*)'))
