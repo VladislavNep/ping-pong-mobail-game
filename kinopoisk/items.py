@@ -50,11 +50,9 @@ class MovieItem(scrapy.Item):
     budget = scrapy.Field()
     fees_in_usa = scrapy.Field()
     fees_in_world = scrapy.Field()
-    age = scrapy.Field()
+    trailer = scrapy.Field()
     movie_shots = scrapy.Field()
     movie_shot_urls = scrapy.Field()
-    img_promo = scrapy.Field()
-    img_promo_urls = scrapy.Field()
     rating_kp = scrapy.Field()
     rating_imdb = scrapy.Field()
     genre = scrapy.Field()
@@ -68,12 +66,16 @@ class MovieLoader(ItemLoader):
     title_out = TakeFirst()
     world_premier_out = TakeFirst()
     rf_premiere_out = TakeFirst()
+    trailer_out = TakeFirst()
 
     time_in = MapCompose(str_to_int)
     time_out = TakeFirst()
 
-    rating_kp_in = MapCompose(lambda value: float(value))
+    rating_kp_in = MapCompose(str_to_float)
     rating_kp_out = TakeFirst()
+
+    rating_imdb_in = MapCompose(str_to_float)
+    rating_imdb_out = TakeFirst()
 
     budget_in = MapCompose(str_to_int)
     budget_out = TakeFirst()

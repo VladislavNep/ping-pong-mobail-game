@@ -52,6 +52,7 @@ class MovieSpider(scrapy.Spider):
         'rating_kp': './/meta[@itemprop="ratingValue"]/@content',
         'imdb': './/div[@id="block_rating"]//div[@class="block_2"]//div[last()]/text()',
         'imdb2': './/div[@id="block_rating"]//div[@class="block_2"]//div[last()-1]/text()',
+        'trailer_id': './/*[@id="movie-trailer-block"]/@data-trailer-id',
     }
 
     # def __init__(self, start_url, **kwargs):
@@ -64,7 +65,7 @@ class MovieSpider(scrapy.Spider):
             url=start_url,
             headers=self.HEADERS,
             callback=self.parse,
-            meta=dict(proxy='200.195.162.242:3128')
+            meta=dict(proxy='117.66.230.49:10098')
         )
 
     def parse(self, response, i=1):
@@ -79,13 +80,18 @@ class MovieSpider(scrapy.Spider):
                 callback=self.get_movie_info,
                 headers=self.HEADERS,
                 cb_kwargs=dict(movie_id=movie_id),
-                meta=dict(proxy='200.195.162.242:3128')
+                meta=dict(proxy='117.66.230.49:10098')
             )
 
-        # if self.get_next_page(response) is not None and (i < 3):
-        #     i += 1
-        #     yield response.follow(url=self.get_next_page(response), callback=self.parse, headers=self.HEADERS,
-        #                           cb_kwargs=dict(i=i))
+        if self.get_next_page(response) is not None:
+            i += 1
+            yield response.follow(
+                url=self.get_next_page(response),
+                callback=self.parse,
+                headers=self.HEADERS,
+                cb_kwargs=dict(i=i),
+                meta=dict(proxy='117.66.230.49:10098')
+            )
 
         yield loader_movid.load_item()
 
@@ -106,7 +112,11 @@ class MovieSpider(scrapy.Spider):
         if not imdb:
             imdb = response.xpath(self.xpath['imdb2']).re_first(r'^IMDb: ([0-9.]+) \(([0-9 ]+)\)$')
         if imdb:
-            loader_inf.add_value('rating_imdb', float(imdb))
+            loader_inf.add_value('rating_imdb', imdb)
+
+        trailer_id = response.xpath(self.xpath['trailer_id']).get()
+        trailer = f'https://widgets.kinopoisk.ru/discovery/trailer/{trailer_id}?onlyPlayer=1&autoplay=0&cover=1'
+        loader_inf.add_value('trailer', trailer)
 
         # бюджет и сборы в $
         budget = ''.join(
@@ -138,7 +148,7 @@ class MovieSpider(scrapy.Spider):
             headers=self.HEADERS,
             meta={
                 'loader': loader_inf,
-                'proxy': '200.195.162.242:3128'
+                'proxy': '117.66.230.49:10098'
             }
         )
 
@@ -160,7 +170,7 @@ class MovieSpider(scrapy.Spider):
             res = yield response.follow(
                 url=response.urljoin(url),
                 headers=self.HEADERS,
-                meta=dict(proxy='200.195.162.242:3128')
+                meta=dict(proxy='117.66.230.49:10098')
             )
 
             loader_inf.add_value('movie_shot_urls', res.css('img#image::attr(src)').get())
