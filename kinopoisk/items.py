@@ -3,8 +3,7 @@
 from scrapy.utils.python import to_unicode
 import scrapy
 from scrapy.loader import ItemLoader
-from scrapy.loader.processors import TakeFirst, MapCompose, Join, Identity
-import regex as re
+from scrapy.loader.processors import TakeFirst, MapCompose, Join, Identity, Compose
 
 
 def replace_chars(text, which_ones=('\n', '\t', '\x85', '\x97'), replace_by=u'', encoding=None):
@@ -32,7 +31,7 @@ def str_to_float(value):
     return float(value)
 
 
-def str_lst_to_int(value):
+def str_list_to_int(value):
     result = [int(x) for x in value if x.isdigit()]
     return result
 
@@ -60,7 +59,6 @@ class MovieItem(scrapy.Item):
 
 
 class MovieLoader(ItemLoader):
-
     default_input_processor = MapCompose(replace_chars)
     description_out = TakeFirst()
     title_out = TakeFirst()
@@ -80,8 +78,8 @@ class MovieLoader(ItemLoader):
     budget_in = MapCompose(str_to_int)
     budget_out = TakeFirst()
 
-    country_out = TakeFirst() if (lambda value: len(value) == 1) else Identity()
-    directors_out = TakeFirst() if (lambda value: len(value) == 1) else Identity()
+    country_out = TakeFirst() if MapCompose(lambda value: len(value) == 1) else Identity()
+    directors_out = TakeFirst() if MapCompose(lambda value: len(value) == 1) else Identity()
 
     fees_in_usa_in = MapCompose(str_to_int)
     fees_in_usa_out = TakeFirst()
@@ -103,4 +101,32 @@ class PersonIdItem(scrapy.Item):
 
 
 class PersonIdLoader(ItemLoader):
-    person_id_in = MapCompose(str_lst_to_int)
+    person_id_out = Compose(str_list_to_int)
+
+
+class PersonItem(scrapy.Item):
+    name = scrapy.Field()
+    roles = scrapy.Field()
+    birthday = scrapy.Field()
+    genre = scrapy.Field()
+    total_movies = scrapy.Field()
+    photo = scrapy.Field()
+    photo_url = scrapy.Field()
+    description = scrapy.Field()
+    place_of_birth = scrapy.Field()
+
+
+class PersonLoader(ItemLoader):
+    name_in = MapCompose(lambda v: v.split())
+    name_out = Join()
+
+    birthday_in = Join()
+    birthday_out = TakeFirst()
+
+    roles_in = Compose(lambda value: [i.strip() for i in value])
+
+    total_movies_in = MapCompose(str_to_int)
+    total_movies_out = TakeFirst()
+
+    description_in = MapCompose(replace_chars)
+    description_out = TakeFirst()

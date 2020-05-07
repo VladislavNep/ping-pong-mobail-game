@@ -70,9 +70,7 @@ DOWNLOADER_MIDDLEWARES = {
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
     'scrapy.pipelines.images.ImagesPipeline': 1,
-    'kinopoisk.pipelines.KinopoiskPipeline': 300,
-    'kinopoisk.pipelines.PostersPipeline': 300,
-    'kinopoisk.pipelines.MovieShotsPipeline': 300,
+    'kinopoisk.pipelines.KinopoiskPipeline': 1,
 }
 
 IMAGES_STORE = '/home/vladislav/PycharmProjects/kinopoisk-api/kinopoisk/img'
@@ -81,6 +79,8 @@ POSTERSPIPELINE_IMAGES_URLS_FIELD = 'poster_url'
 POSTERSPIPELINE_IMAGES_RESULT_FIELD = 'poster'
 MOVIESHOTSPIPELINE_IMAGES_URLS_FIELD = 'movie_shot_urls'
 MOVIESHOTSPIPELINE_IMAGES_RESULT_FIELD = 'movie_shots'
+PERSONPHOTOPIPELINE_IMAGES_URLS_FIELD = 'photo_url'
+PERSONPHOTOPIPELINE_IMAGES_RESULT_FIELD = 'photo'
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html

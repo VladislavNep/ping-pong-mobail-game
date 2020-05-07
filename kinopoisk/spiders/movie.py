@@ -27,6 +27,13 @@ class MovieSpider(scrapy.Spider):
     }
     """
     name = "movie"
+    custom_settings = {
+        'ITEM_PIPELINES': {
+            'scrapy.pipelines.images.ImagesPipeline': 1,
+            'kinopoisk.pipelines.PostersPipeline': 300,
+            'kinopoisk.pipelines.MovieShotsPipeline': 300,
+        }
+    }
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -79,7 +86,7 @@ class MovieSpider(scrapy.Spider):
 
             yield response.follow(
                 url=f'/film/{movie_id}',
-                callback=self.get_person_id,
+                callback=self.get_movie_info,
                 headers=self.HEADERS,
                 cb_kwargs=dict(movie_id=movie_id),
                 meta=dict(proxy=random.choice(self.proxy_pool))
@@ -92,7 +99,7 @@ class MovieSpider(scrapy.Spider):
                 callback=self.parse,
                 headers=self.HEADERS,
                 cb_kwargs=dict(i=i),
-                meta=dict(proxy='117.66.235.133:10098')
+                meta=dict(proxy=random.choice(self.proxy_pool))
             )
 
         yield loader_movid.load_item()
@@ -162,7 +169,7 @@ class MovieSpider(scrapy.Spider):
             actors_id = response.css(self.css['actors'])[0].css('li>a::attr(href)')[:5].re(r'([0-9]\d*)')
             loader_per.add_value('person_id', actors_id)
 
-        yield loader_per.load_item()
+        return loader_per.load_item()
 
     @inline_requests
     def movie_shots(self, response):
