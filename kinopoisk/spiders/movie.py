@@ -1,3 +1,4 @@
+import random
 from fake_useragent import UserAgent
 import scrapy
 from scrapy.loader.processors import Join
@@ -11,7 +12,8 @@ class MovieSpider(scrapy.Spider):
     :returns: {
     title: str,
     description: str,
-    poster: str: file_path,
+    poster: file_path,
+    trailer: url,
     country: str,
     directors: [],
     actors: [],
@@ -19,53 +21,53 @@ class MovieSpider(scrapy.Spider):
     budget: int,
     fees_in_usa: int,
     fees_in_world: int,
-    age: int,
+    rating_kp: float,
+    rating_imdb: float,
     movie_shots: [file_path],
     }
     """
     name = "movie"
-    HEADERS = {
-        'User-Agent': UserAgent().random,
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-    }
-    BASE_URL = 'https://www.kinopoisk.ru'
-    css = {
-        'movie_items': 'div.selection-list > div.desktop-rating-selection-film-item',
-        'title': '.moviename-title-wrapper::text',
-        'movie_link': 'a.selection-film-item-meta__link::attr(href)',
-        'movie_info': 'div.movie-info__table-container>#infoTable>table#info',
-        'actors': 'div.movie-info__table-container>#actorList ul',
-        'world_premier': '#div_world_prem_td2 > div:nth-child(1) > a::text',
-        'rf_premiere': '.rel-date_description > span:nth-child(2) > a::text',
-        'country': 'table.info > tr:nth-child(2) > td:nth-child(2) > div:nth-child(1) > a::text',
-        'budget1': '.en > td.dollar a::text',
-        'budget2': '.en > td.dollar ::text',
-        'description': '.film-synopsys::text',
-        'time': '#runtime::text',
-        'fees_in_usa': '#div_usa_box_td2 > div:nth-child(1) > a::text',
-    }
 
-    xpath = {
-        'directors': './/td[@itemprop="director"]/a/text()',
-        'director_id': './/td[@itemprop="director"]/a/@href',
-        'genre': './/td[2]/span[@itemprop="genre"]/a/text()',
-        'rating_kp': './/meta[@itemprop="ratingValue"]/@content',
-        'imdb': './/div[@id="block_rating"]//div[@class="block_2"]//div[last()]/text()',
-        'imdb2': './/div[@id="block_rating"]//div[@class="block_2"]//div[last()-1]/text()',
-        'trailer_id': './/*[@id="movie-trailer-block"]/@data-trailer-id',
-    }
-
-    # def __init__(self, start_url, **kwargs):
-    #     super().__init__(**kwargs)
-    #     self.start_url = start_url
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.start_url = 'https://www.kinopoisk.ru/popular/?quick_filters=films%2Cavailable_online&tab=online'
+        self.HEADERS = {
+            'User-Agent': UserAgent().random,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        }
+        self.BASE_URL = 'https://www.kinopoisk.ru'
+        self.css = {
+            'movie_items': 'div.selection-list > div.desktop-rating-selection-film-item',
+            'title': '.moviename-title-wrapper::text',
+            'movie_link': 'a.selection-film-item-meta__link::attr(href)',
+            'movie_info': 'div.movie-info__table-container>#infoTable>table#info',
+            'actors': 'div.movie-info__table-container>#actorList ul',
+            'world_premier': '#div_world_prem_td2 > div:nth-child(1) > a::text',
+            'rf_premiere': '.rel-date_description > span:nth-child(2) > a::text',
+            'country': 'table.info > tr:nth-child(2) > td:nth-child(2) > div:nth-child(1) > a::text',
+            'budget1': '.en > td.dollar a::text',
+            'budget2': '.en > td.dollar ::text',
+            'description': '.film-synopsys::text',
+            'time': '#runtime::text',
+            'fees_in_usa': '#div_usa_box_td2 > div:nth-child(1) > a::text',
+        }
+        self.xpath = {
+            'directors': './/td[@itemprop="director"]/a/text()',
+            'director_id': './/td[@itemprop="director"]/a/@href',
+            'genre': './/td[2]/span[@itemprop="genre"]/a/text()',
+            'rating_kp': './/meta[@itemprop="ratingValue"]/@content',
+            'imdb': './/div[@id="block_rating"]//div[@class="block_2"]//div[last()]/text()',
+            'imdb2': './/div[@id="block_rating"]//div[@class="block_2"]//div[last()-1]/text()',
+            'trailer_id': './/*[@id="movie-trailer-block"]/@data-trailer-id',
+        }
+        self.proxy_pool = ['82.119.170.106:8080']
 
     def start_requests(self):
-        start_url = 'https://www.kinopoisk.ru/popular/?quick_filters=films&tab=all'
         yield scrapy.Request(
-            url=start_url,
+            url=self.start_url,
             headers=self.HEADERS,
             callback=self.parse,
-            meta=dict(proxy='117.66.230.49:10098')
+            meta=dict(proxy=random.choice(self.proxy_pool))
         )
 
     def parse(self, response, i=1):
@@ -76,11 +78,11 @@ class MovieSpider(scrapy.Spider):
             loader_movid.add_value('movie_id', int(movie_id))
 
             yield response.follow(
-                url=f'{self.BASE_URL}/film/{movie_id}',
-                callback=self.get_movie_info,
+                url=f'/film/{movie_id}',
+                callback=self.get_person_id,
                 headers=self.HEADERS,
                 cb_kwargs=dict(movie_id=movie_id),
-                meta=dict(proxy='117.66.230.49:10098')
+                meta=dict(proxy=random.choice(self.proxy_pool))
             )
 
         if self.get_next_page(response) is not None:
@@ -90,7 +92,7 @@ class MovieSpider(scrapy.Spider):
                 callback=self.parse,
                 headers=self.HEADERS,
                 cb_kwargs=dict(i=i),
-                meta=dict(proxy='117.66.230.49:10098')
+                meta=dict(proxy='117.66.235.133:10098')
             )
 
         yield loader_movid.load_item()
@@ -130,12 +132,9 @@ class MovieSpider(scrapy.Spider):
         loader_inf.add_value('fees_in_world', fees_in_world)
 
         # вытаскиваем актеров
-        if response.css(self.css['actors']) is not None:
+        if response.css(self.css['actors']):
             actors_name = response.css(self.css['actors'])[0].css('li>a::text')[:5].getall()
             loader_inf.add_value('actors', actors_name)
-
-        # вытаскиваем все id людей для дальнейшего использования
-        self.get_person_id(response)
 
         # вытаскиваем постер фильма для скачивания
         poster_url = self.BASE_URL + f'/images/film_big/{movie_id}.jpg'
@@ -148,15 +147,18 @@ class MovieSpider(scrapy.Spider):
             headers=self.HEADERS,
             meta={
                 'loader': loader_inf,
-                'proxy': '117.66.230.49:10098'
+                'proxy': random.choice(self.proxy_pool)
             }
         )
 
+        # вытаскиваем все id людей для дальнейшего использования
+        yield self.get_person_id(response)
+
     def get_person_id(self, response):
         loader_per = PersonIdLoader(item=PersonIdItem(), response=response)
-        loader_per.add_xpath('person_id', self.xpath['director_id'])
+        loader_per.add_xpath('person_id', self.xpath['director_id'], re=r'([0-9]\d*)')
 
-        if response.css(self.css['actors']) is not None:
+        if response.css(self.css['actors']):
             actors_id = response.css(self.css['actors'])[0].css('li>a::attr(href)')[:5].re(r'([0-9]\d*)')
             loader_per.add_value('person_id', actors_id)
 
@@ -170,7 +172,7 @@ class MovieSpider(scrapy.Spider):
             res = yield response.follow(
                 url=response.urljoin(url),
                 headers=self.HEADERS,
-                meta=dict(proxy='117.66.230.49:10098')
+                meta=dict(proxy=random.choice(self.proxy_pool))
             )
 
             loader_inf.add_value('movie_shot_urls', res.css('img#image::attr(src)').get())
