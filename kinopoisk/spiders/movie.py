@@ -186,10 +186,12 @@ class MovieSpider(scrapy.Spider):
 
         yield loader_inf.load_item()
 
-    def get_next_page(self, response):
+    @staticmethod
+    def get_next_page(response):
         content_url = response.css('div.paginator>a.paginator__page-relative::text')[-1].get() == ('Вперёд' or 'Next')
         url = response.css('div.paginator>a.paginator__page-relative::attr(href)')[-1].get()
         return response.urljoin(url) if content_url else None
 
-    def get_count_page(self, response):
+    @staticmethod
+    def get_count_page(response):
         return response.css('div.paginator a.paginator__page-number::text')[-1].get()

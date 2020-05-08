@@ -33,11 +33,11 @@ class PersonSpider(scrapy.Spider):
         self.proxy_pool = ['113.120.37.253:10098']
 
     def get_person_id(self, file_path):
-        res = []
+        res = set()
         with open(file_path, 'r') as f:
             data = json.loads(f.read())
             for i in data:
-                res += i["person_id"]
+                res.update(i["roles"])
         return res
 
     def start_requests(self):
@@ -66,10 +66,6 @@ class PersonSpider(scrapy.Spider):
             elif info.css('td.type::text').get() == 'дата рождения':
                 birthday = info.css('td.birth>a::text').getall()
                 loader.add_value('birthday', birthday)
-
-            elif info.css('td.type::text').get() == 'место рождения':
-                place_of_birth = info.css('td.birth>span>a::text').getall()
-                loader.add_value('place_of_birth', place_of_birth)
 
             elif info.css('td.type::text').get() == 'жанры':
                 genre = info.css('td')[1].css('a::text').getall()
