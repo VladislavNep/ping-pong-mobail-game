@@ -39,8 +39,9 @@ FEED_EXPORT_ENCODING = 'utf-8'
 
 # Override the default request headers:
 # DEFAULT_REQUEST_HEADERS = {
+#   'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:10.0) Gecko/20100101 Firefox/62.0',
 #   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-#   'Accept-Language': 'en',
+#   'Accept-Language': 'ru',
 # }
 
 # Enable or disable spider middlewares
@@ -70,7 +71,7 @@ DOWNLOADER_MIDDLEWARES = {
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
     'scrapy.pipelines.images.ImagesPipeline': 1,
-    'kinopoisk.pipelines.KinopoiskPipeline': 1,
+    # 'kinopoisk.pipelines.KinopoiskPipeline': 1,
 }
 
 IMAGES_STORE = '/home/vladislav/PycharmProjects/kinopoisk-api/kinopoisk/img'

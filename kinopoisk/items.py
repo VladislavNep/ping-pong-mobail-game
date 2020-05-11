@@ -89,7 +89,7 @@ class MovieLoader(ItemLoader):
 
 
 class MovieIdItem(scrapy.Item):
-    movie_id = scrapy.Field(serializer=int)
+    movie_id = scrapy.Field()
 
 
 class MovieIdLoader(ItemLoader):
@@ -97,7 +97,7 @@ class MovieIdLoader(ItemLoader):
 
 
 class PersonIdItem(scrapy.Item):
-    person_id = scrapy.Field(serializer=int)
+    person_id = scrapy.Field()
 
 
 class PersonIdLoader(ItemLoader):

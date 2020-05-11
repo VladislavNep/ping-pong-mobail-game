@@ -57,10 +57,6 @@ class PersonPhotoPipeline(ImagesPipeline):
         image_guid = hashlib.sha1(to_bytes(request.url)).hexdigest()
         return 'person/%s.jpg' % image_guid
 
-    def get_media_requests(self, item, info):
-        for image_url in item['photo_url']:
-            yield scrapy.Request(image_url)
-
     def item_completed(self, results, item, info):
         poster_paths = [x['path'] for ok, x in results if ok]
         if not poster_paths:

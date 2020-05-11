@@ -37,7 +37,7 @@ class MovieSpider(scrapy.Spider):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.start_url = 'https://www.kinopoisk.ru/popular/?quick_filters=films%2Cavailable_online&tab=online'
+        self.start_url = 'https://www.kinopoisk.ru/popular/?quick_filters=films&tab=all'
         self.HEADERS = {
             'User-Agent': UserAgent().random,
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
@@ -83,6 +83,7 @@ class MovieSpider(scrapy.Spider):
         for movie_item in response.css(self.css['movie_items']):
             movie_id = movie_item.css(self.css['movie_link']).re_first(r'([0-9]\d*)')
             loader_movid.add_value('movie_id', int(movie_id))
+            self.HEADERS['User-Agent'] = UserAgent().random
 
             yield response.follow(
                 url=f'/film/{movie_id}',
@@ -94,12 +95,13 @@ class MovieSpider(scrapy.Spider):
 
         if self.get_next_page(response) is not None:
             i += 1
+            self.HEADERS['User-Agent'] = UserAgent().random
             yield response.follow(
                 url=self.get_next_page(response),
                 callback=self.parse,
                 headers=self.HEADERS,
                 cb_kwargs=dict(i=i),
-                meta=dict(proxy=random.choice(self.proxy_pool))
+                # meta=dict(proxy=random.choice(self.proxy_pool))
             )
 
         yield loader_movid.load_item()
@@ -148,6 +150,7 @@ class MovieSpider(scrapy.Spider):
         loader_inf.add_value('poster_url', poster_url)
 
         # вытаскиваем movie shots
+        self.HEADERS['User-Agent'] = UserAgent().random
         yield response.follow(
             url=self.BASE_URL + f'/film/{movie_id}/stills',
             callback=self.movie_shots,
@@ -176,6 +179,7 @@ class MovieSpider(scrapy.Spider):
         loader_inf = response.meta['loader']
         urls = response.css('table.js-rum-hero > tr > td > a::attr(href)')[:9].getall()
         for url in urls:
+            self.HEADERS['User-Agent'] = UserAgent().random
             res = yield response.follow(
                 url=response.urljoin(url),
                 headers=self.HEADERS,
