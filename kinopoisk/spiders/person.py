@@ -1,6 +1,6 @@
-import datetime
 import json
-import random
+from stem import Signal
+from stem.control import Controller
 from scrapy.loader.processors import Join
 import scrapy
 import time
@@ -15,6 +15,7 @@ class PersonSpider(scrapy.Spider):
         'ITEM_PIPELINES': {
             'scrapy.pipelines.images.ImagesPipeline': 1,
             'kinopoisk.pipelines.PersonPhotoPipeline': 300,
+            'kinopoisk.pipelines.KinopoiskPipeline': 200,
         },
 
         'FEEDS': {
@@ -42,10 +43,15 @@ class PersonSpider(scrapy.Spider):
             'item_type': '.info > tr',
             'name': 'h1.moviename-big::text',
             'photo': '.film-img-box img[itemprop="image"]::attr(src)',
-            'photo2': '.film-img-box a img[itemprop="image"]::attr(src)',
             'description': 'ul.trivia > li.trivia::text',
         }
         self.proxy_pool = ['144.217.101.242:3129']
+
+    @staticmethod
+    def switch_ip():
+        with Controller.from_port(port=9051) as controller:
+            controller.authenticate(password='pass')
+            controller.signal(Signal.NEWNYM)
 
     def get_person_id(self, file_path):
         res = set()
@@ -57,6 +63,7 @@ class PersonSpider(scrapy.Spider):
 
     def start_requests(self):
         for person_id in self.get_person_id(self.file_path):
+            self.switch_ip()
             time.sleep(5)
             url = f'https://www.kinopoisk.ru/name/{person_id}/view_info/ok/#trivia'
             self.HEADERS['User-Agent'] = UserAgent().random
@@ -64,12 +71,14 @@ class PersonSpider(scrapy.Spider):
                 url=url,
                 headers=self.HEADERS,
                 callback=self.parse_info,
-                meta=dict(proxy=random.choice(self.proxy_pool)),
-                cb_kwargs=dict(person_id=person_id)
+                meta=dict(proxy='127.0.0.1:8118'),
+                cb_kwargs=dict(person_id=person_id),
+                dont_filter=True
             )
 
     def parse_info(self, response, person_id):
         print(f"Парсим пользователя {person_id}")
+        print('meta: ', response.meta)
         loader = PersonLoader(item=PersonItem(), response=response)
         loader.add_css('name', self.css['name'])
 
