@@ -6,6 +6,7 @@
 # https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
 from scrapy import signals
+from toripchanger import TorIpChanger
 
 
 class KinopoiskSpiderMiddleware(object):
@@ -101,3 +102,15 @@ class KinopoiskDownloaderMiddleware(object):
 
     def spider_opened(self, spider):
         spider.logger.info('Spider opened: %s' % spider.name)
+
+
+# A Tor IP will be reused only after 10 different IPs were used.
+ip_changer = TorIpChanger(tor_password='891vnp505', tor_port=9051, reuse_threshold=300)
+
+
+class ProxyMiddleware(object):
+
+    def process_request(self, request, spider):
+        ip_changer.get_new_ip()
+        request.meta['proxy'] = 'http://127.0.0.1:8118'
+        spider.log('Proxy : %s' % request.meta['proxy'])

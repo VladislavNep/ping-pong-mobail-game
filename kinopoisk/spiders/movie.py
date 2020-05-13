@@ -2,6 +2,7 @@ import random
 from fake_useragent import UserAgent
 import scrapy
 from scrapy.loader.processors import Join
+from kinopoisk.tormanager import ConnectionManager
 from kinopoisk.items import MovieItem, MovieLoader, MovieIdItem, MovieIdLoader, PersonIdItem, PersonIdLoader
 from inline_requests import inline_requests
 
@@ -30,18 +31,19 @@ class MovieSpider(scrapy.Spider):
     custom_settings = {
         'ITEM_PIPELINES': {
             'scrapy.pipelines.images.ImagesPipeline': 1,
-            'kinopoisk.pipelines.PostersPipeline': 300,
+            'kinopoisk.pipelines.PostersPipeline': 310,
             'kinopoisk.pipelines.MovieShotsPipeline': 300,
-        }
+        },
+
+        "DOWNLOAD_DELAY": 5,
+        "CONCURRENT_REQUESTS_PER_DOMAIN": 2,
+        "CONCURRENT_REQUESTS": 2,
     }
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.start_url = 'https://www.kinopoisk.ru/popular/?quick_filters=films&tab=all'
-        self.HEADERS = {
-            'User-Agent': UserAgent().random,
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-        }
+        self.cm = ConnectionManager('891vnp505')
         self.BASE_URL = 'https://www.kinopoisk.ru'
         self.css = {
             'movie_items': 'div.selection-list > div.desktop-rating-selection-film-item',
@@ -67,41 +69,62 @@ class MovieSpider(scrapy.Spider):
             'imdb2': './/div[@id="block_rating"]//div[@class="block_2"]//div[last()-1]/text()',
             'trailer_id': './/*[@id="movie-trailer-block"]/@data-trailer-id',
         }
-        self.proxy_pool = ['82.119.170.106:8080']
 
     def start_requests(self):
         yield scrapy.Request(
             url=self.start_url,
-            headers=self.HEADERS,
+            headers={
+                    'User-Agent': UserAgent().random,
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
+                    'Referer': 'www.kinopoisk.ru',
+                    'Host': 'www.kinopoisk.ru'
+                },
             callback=self.parse,
-            meta=dict(proxy=random.choice(self.proxy_pool))
+            meta=dict(proxy='127.0.0.1:8118')
         )
 
     def parse(self, response, i=1):
+        _count_req = 0
         print(f"Парсинг {i} страницы из {self.get_count_page(response)}")
         loader_movid = MovieIdLoader(item=MovieIdItem())
         for movie_item in response.css(self.css['movie_items']):
+            _count_req += 1
+            if _count_req >= 30:
+                self.cm.new_identity()
+                _count_req = 0
+
             movie_id = movie_item.css(self.css['movie_link']).re_first(r'([0-9]\d*)')
             loader_movid.add_value('movie_id', int(movie_id))
-            self.HEADERS['User-Agent'] = UserAgent().random
 
             yield response.follow(
                 url=f'/film/{movie_id}',
                 callback=self.get_movie_info,
-                headers=self.HEADERS,
+                headers={
+                    'User-Agent': UserAgent().random,
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
+                    'Referer': response.url,
+                    'Host': 'www.kinopoisk.ru'
+                },
                 cb_kwargs=dict(movie_id=movie_id),
-                meta=dict(proxy=random.choice(self.proxy_pool))
+                meta=dict(proxy='127.0.0.1:8118')
             )
 
         if self.get_next_page(response) is not None:
             i += 1
-            self.HEADERS['User-Agent'] = UserAgent().random
             yield response.follow(
                 url=self.get_next_page(response),
                 callback=self.parse,
-                headers=self.HEADERS,
+                headers={
+                    'User-Agent': UserAgent().random,
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
+                    'Referer': response.url,
+                    'Host': 'www.kinopoisk.ru'
+                },
                 cb_kwargs=dict(i=i),
-                # meta=dict(proxy=random.choice(self.proxy_pool))
+                meta=dict(proxy='127.0.0.1:8118')
             )
 
         yield loader_movid.load_item()
@@ -150,14 +173,19 @@ class MovieSpider(scrapy.Spider):
         loader_inf.add_value('poster_url', poster_url)
 
         # вытаскиваем movie shots
-        self.HEADERS['User-Agent'] = UserAgent().random
         yield response.follow(
             url=self.BASE_URL + f'/film/{movie_id}/stills',
             callback=self.movie_shots,
-            headers=self.HEADERS,
+            headers={
+                'User-Agent': UserAgent().random,
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
+                'Referer': response.url,
+                'Host': 'www.kinopoisk.ru'
+            },
             meta={
                 'loader': loader_inf,
-                'proxy': random.choice(self.proxy_pool)
+                'proxy': '127.0.0.1:8118'
             }
         )
 
@@ -179,11 +207,16 @@ class MovieSpider(scrapy.Spider):
         loader_inf = response.meta['loader']
         urls = response.css('table.js-rum-hero > tr > td > a::attr(href)')[:9].getall()
         for url in urls:
-            self.HEADERS['User-Agent'] = UserAgent().random
             res = yield response.follow(
                 url=response.urljoin(url),
-                headers=self.HEADERS,
-                meta=dict(proxy=random.choice(self.proxy_pool))
+                headers={
+                    'User-Agent': UserAgent().random,
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
+                    'Referer': response.url,
+                    'Host': 'www.kinopoisk.ru'
+                },
+                meta=dict(proxy='127.0.0.1:8118')
             )
 
             loader_inf.add_value('movie_shot_urls', res.css('img#image::attr(src)').get())

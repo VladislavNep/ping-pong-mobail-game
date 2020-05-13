@@ -62,4 +62,5 @@ class PersonPhotoPipeline(ImagesPipeline):
         if not poster_paths:
             raise DropItem("Item contains no images")
         item['photo'] = poster_paths[0]
+        print("OK")
         return item
